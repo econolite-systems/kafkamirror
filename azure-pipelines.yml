@@ -1,0 +1,112 @@
+trigger:
+  branches:
+    include:
+    - main
+    - rc/*
+    - develop
+    - feature/*
+
+variables:
+
+# Version information
+- name: version.major
+  value: '1'
+- name: version.minor
+  value: '0'
+
+  # Name for the container publish to be used by release
+- name: imageRepository
+  value: 'kafka-mirror-svc'
+  # Path from root where Dockerfile lives
+- name: dockerfilePath
+  value: './$(Build.Repository.Name)/KafkaMirror/Dockerfile'
+
+  # Container registry service connection established during pipeline creation
+- name: dockerRegistryServiceConnection
+  value: 'bf0a15b0-1048-4382-ad57-fbcd0cd84622'
+- name: containerRegistry
+  value: 'cosysdev.azurecr.io'
+  # Agent VM image name
+- name: vmImageName
+  value: 'ubuntu-latest'
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: DevOps/templates
+    ref: refs/tags/1.2
+
+stages:
+# Versioning master branch builds
+- template: buildversion.yml@templates
+  parameters:
+    major: $(version.major)
+    minor: $(version.minor)
+
+# Building and pushing contianer
+- stage: Build
+  displayName: Build and push stage
+  condition: always()
+  jobs: 
+  - job: Tests
+    pool:
+      vmImage: $(vmImageName)
+    displayName: Build and run tests and analyze
+    steps:
+    - checkout: self
+      submodules: true
+      persistCredentials: true
+    - checkout: templates
+    #- task: NuGetAuthenticate@0
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: 'build'
+        workingDirectory: './$(Build.Repository.Name)'
+    - task: DotNetCoreCLI@2
+      displayName: Test
+      condition: succeeded()
+      inputs:
+        projects: '**/*Tests/*.csproj'
+        command: 'test'
+  - job: Build
+    pool:
+      name: 'DockerAgents'
+    displayName: Build
+    dependsOn: Tests
+    steps:
+    - checkout: self
+      submodules: true
+    - checkout: templates
+    - task: Bash@3
+      displayName: Version Files
+      inputs:
+        filePath: 'templates/versionfiles.sh'
+        workingDirectory: 'templates'
+    - task: Docker@2
+      condition: succeeded()
+      displayName: Build docker
+      inputs:
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        repository: '$(imageRepository)'
+        command: 'build'
+        Dockerfile: '$(dockerfilePath)'
+        tags: '$(Build.BuildNumber)'
+        arguments: '--build-arg PAT=$(artifacts.pat) --build-arg FEED_URL=$(artifacts.feed)'
+        buildContext: './$(Build.Repository.Name)/'
+    - task: Docker@2
+      displayName: Push docker image to Registry
+      condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+      inputs:
+        containerRegistry: 'Docker Container Registry'
+        repository: '$(imageRepository)'
+        command: 'push'
+        tags: '$(Build.BuildNumber)'
+    # Publish helm files for the release
+    #- task: PublishPipelineArtifact@1
+    #  displayName: 'Publish Helm Artifact for Release'
+    #  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    #  inputs:
+    #    targetPath: './$(Build.Repository.Name)/devops/helm-charts'
+    #    artifact: helm-charts

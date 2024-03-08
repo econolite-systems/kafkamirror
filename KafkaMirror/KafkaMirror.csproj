@@ -1,0 +1,25 @@
+ <Project Sdk="Microsoft.NET.Sdk.Web">
+<!-- # SPDX-License-Identifier: MIT -->
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <UserSecretsId>KafkaMirror</UserSecretsId>
+        <AssemblyVersion>1.2.3.0</AssemblyVersion>
+        <FileVersion>1.2.3.0</FileVersion>
+        <Copyright>2023-&lt;&lt;CURRENT_YEAR&gt;&gt; Econolite Systems, Inc.</Copyright>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)\common\Extensions.AspNet\Extensions.AspNet.csproj" />
+        <ProjectReference Include="$(SolutionDir)\common\Messaging\Messaging.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="7.0.0" />
+        <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.18.1" />
+    </ItemGroup>
+
+</Project>
